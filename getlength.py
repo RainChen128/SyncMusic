@@ -1,5 +1,6 @@
 import sys
 import os
+sys.path.append('/home/rainchen/.local/lib/python3.7/site-packages')
 import mutagen.mp3
 from mutagen.mp3 import MP3
 if len(sys.argv) < 2:
