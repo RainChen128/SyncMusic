@@ -867,6 +867,8 @@ class SyncMusic {
 		if(substr($data['data'],0,8) == "https://"){
 			//音乐文件链接就是点歌链接
 			$musicUrl = $data['data'];
+			$baseNmae = basename($musicUrl,".mp3");
+			$musicData = $this->fetchMusic("§".$baseName, $musicUrl);
 			//计算音乐文件名的字符长度 总长 - 前缀 - .mp3
 			$nameLenth = strlen($data['data']) - 29 -4;
 			//通过字符长度获取音乐文件名
@@ -1739,15 +1741,28 @@ EOF;
 	 */
 	private function fetchMusic($m, $download = '')
 	{
-		if(!file_exists(ROOT . "/tmp/{$m['id']}.mp3")) {
+		if(substr($m,0,1) == "§"){
+			$orginalMusicName = substr($m,1);
+			$validatePath = "/tmp/".$orginalMusicName.".mp3";
+			if(!file_exists(ROOT . $validatePath)){
+				$this->consoleLog("远程歌曲".$orginalMusicName."不存在，下载中...", 1, true);
+				$musicFile = @file_get_contents($download);
+				$this->consoleLog("远程歌曲".$orginalMusicName."下载完成。", 1, true);
+				$timeStamp = time();
+				@file_put_contents(ROOT . "/tmp/".$timeStamp.".mp3", $musicFile);
+			}
+		}
+		elseif(!file_exists(ROOT . "/tmp/{$m['id']}.mp3")) {
 			$this->consoleLog("歌曲 {$m['name']} 不存在，下载中...", 1, true);
 			$musicFile = @file_get_contents($download);
 			$this->consoleLog("歌曲 {$m['name']} 下载完成。", 1, true);
 			@file_put_contents(ROOT . "/tmp/{$m['id']}.mp3", $musicFile);
+			return $musicFile;
 		} else {
 			$musicFile = @file_get_contents(ROOT . "/tmp/{$m['id']}.mp3");
+			return $musicFile;
 		}
-		return $musicFile;
+		
 	}
 	
 	/**
