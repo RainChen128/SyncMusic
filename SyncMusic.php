@@ -862,19 +862,25 @@ class SyncMusic {
 		$musicList  = $this->getMusicList();
 		$sourceList = $this->getMusicShow();
 		$this->lockSearch();
-		// 开始搜索音乐
-		//匹配本地点歌，使用https://特征
-		if(substr($data['data'],0,8) == "https://"){
-			//音乐文件链接就是点歌链接
-			$musicUrl = $data['data'];
-			//计算音乐文件名的字符长度 总长 - 前缀 - .mp3
-			$nameLenth = strlen($data['data']) - 29 -4;
-			//通过字符长度获取音乐文件名
-			$musicId = substr($data['data'],29,$nameLenth);
-			//调用函数获取音乐时长
-			$musicTime = $this->getMusicLength($musicId);
-			// 如果音乐的长度为 0（说明下载失败或其他原因）
-			if($musicTime == 0) {
+		//哼，哼，啊啊啊啊啊啊啊啊啊啊啊啊啊啊阿啊啊啊啊啊啊啊啊啊啊啊啊啊啊-这是分割线-啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊阿
+		if(substr($data['data'],0,8) == "https://"){//匹配自定义点歌，使用https://特征
+			$musicUrl = $data['data'];//音乐文件链接就是点歌链接
+			$musicName = urldecode(basename($data['data'],".mp3"));//音乐名 = url解码后的文件名，不带扩展名
+			$randomNum = time().random_int(100,999);//用劣质方法创建随机数字串，为linux时间戳 + [100,999]随机数
+			if(!file_exists(ROOT . "/tmp/{$musicName}.mp3")) {//tmp文件夹是不否存在歌曲？此时使用的还是url提供的文件名
+				$this->consoleLog("歌曲 {$musicName} 不在本地，下载中...", 1, true);
+				$musicFile = @file_get_contents($musicUrl);//获取了文件内容，存入变量
+				$this->consoleLog("歌曲 {$musicName} 下载完成。", 1, true);
+				@file_put_contents(ROOT . "/tmp/{$randomNum}.mp3", $musicFile);//使用随机数字串保存了文件
+			} else {
+				copy(ROOT . "/tmp/{$musicName}.mp3",ROOT . "/tmp/{$randomNum}.mp3");//复制一份文件并重命名成随机数字串，防止有人从tmp点歌，直接重命名会导致原始url404
+				$musicFile = @file_get_contents(ROOT . "/tmp/{$randomNum}.mp3");//获取了本地文件的内容，存入变量
+			}
+			if(strlen($musicFile) > 0) {//如果不是空文件
+			$musicTime = $this->getMusicLength($randomNum);//调用函数获取音乐时长，此处使用文件名为数字串的副本
+			unlink(ROOT . "/tmp/".$randomNum.".mp3");//不再需要副本或缓存文件了，成为赛博碎片吧（无慈悲）。
+		//恶臭文件下载结束了啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊
+			if($musicTime == 0) {// 如果音乐的长度为 0（说明下载失败或其他原因）
 				$this->unlockSearch();
 				$this->server->finish(["id" => $data['id'], "action" => "msg", "data" => "歌曲下载失败，错误：音乐时长为0"]);
 			} elseif($musicTime > MAX_MUSICLENGTH) {
@@ -883,29 +889,44 @@ class SyncMusic {
 			} else {
 					// 保存列表
 					$clientIp = $data['id'] ? $this->getClientIp($data['id']) : "127.0.0.1";
+					$mp3Info = readmp3(ROOT . "/tmp/" . $randomNum . ".mp3");
+									$fileOpen = fopen(ROOT . "/tmp/" . $randomNum . ".mp3", "rb");
+									fseek($fileOpen, -128, SEEK_END);
+									$tag = fread($fileOpen, 3);
+									
+									if ($tag == "TAG") {
+										$mp3 = array();
+
+										$mp3['标题'] = fread($fileOpen, 30);
+										$mp3['艺术家'] = fread($fileOpen, 30);
+										
+										$name = $mp3['标题'];
+										$album = $mp3['专辑'];
+										$artists = $mp3['艺术家'];
+									} else {
+										$localSongName = $randomNum;
+										$localSongAlbum = "unknown";
+										$localSongArtists = "unknown";
+									}
 					$musicList[] = [
 									//这里的$musicUrl与函数getMusicUrl()的代码有关联
 									"id"      => $musicUrl,
-									//输出文件名
-									"name"    => $musicId,
-									//输出音乐文件地址
-									"file"    => $musicUrl,
-									//输出音乐时长
-									"time"    => $musicTime,
-									//技术力枯竭，之后再想
-									"album"   => "不知道",
-									"artists" => "不知道",
-									"image"   => "https://m.sakuya.pw:2020/noimg.png",
+									"name"    => $localSongName,//输出歌曲名 或 $randomNum(设定的文件名)
+									"album"   => $localSongAlbum,//输出专辑名 或 "unknown"
+									"artists"  => $localSongArtists,//输出艺术家 或 "unknown"
+									"file"    => $musicUrl,//输出音乐文件地址
+									"time"    => $musicTime,//输出音乐时长
+									"image"   => "https://m.sakuya.pw:2020/noimg.jpg",//你不要过来啊！！
 									"user"    => $clientIp
 									];
 					$sourceList[] = [
 									"id"      => $musicUrl,
-									"name"    => $musicId,
+									"name"    => $localSongName,//输出歌曲名 或 $randomNum(设定的文件名)
+									"album"   => $localSongAlbum,//输出专辑名 或 "unknown"
+									"artists"  => $localSongArtists,//输出艺术家 或 "unkno
 									"file"    => $musicUrl,
 									"time"    => $musicTime,
-									"album"   => "不知道",
-									"artists" => "不知道",
-									"image"   => "https://m.sakuya.pw:2020/noimg.png",
+									"image"   => "https://m.sakuya.pw:2020/noimg.jpg",
 									"user"    => $clientIp
 									];
 					$this->setMusicList($musicList);
@@ -924,6 +945,10 @@ class SyncMusic {
 					$this->unlockSearch();
 					$this->server->finish(["id" => $data['id'], "action" => "msg", "data" => "点歌成功"]);
 					}
+				}else {
+				$this->unlockSearch();
+				$this->server->finish(["id" => $data['id'], "action" => "msg", "data" => "歌曲下载失败，错误代码：ERROR_FILE_EMPTY"]);
+			}
 		}
 		else{
 		$json = $this->fetchMusicApi($data['data']);
